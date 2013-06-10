@@ -1,0 +1,403 @@
+<html>
+<head>
+<script type="text/javascript">
+var leftarmdata = {angleoffset:-2.627794,angle:-2.627794,length:116,pivot:{x:320,y:266},pivotoffset:{x:135,y:6}};
+var leftshoulderdata = {angleoffset:-2.330629,angle:-2.330629,length:124,pivot:{x:405,y:176},pivotoffset:{x:94,y:7}};
+var bodydata = {angleoffset:Math.PI/2,angle:Math.PI/2,length:525,pivot:{x:451,y:556},pivotoffset:{x:167,y:517}};
+var rightshoulderdata = {angleoffset:-1.9652407,angle:-1.9652407,length:122,pivot:{x:572,y:218},pivotoffset:{x:53,y:10}};
+var rightarmdata = {angleoffset:-0.018179,angle:-0.018179,length:110,pivot:{x:526,y:331},pivotoffset:{x:8,y:17}};
+var leftstickdata = {angleoffset:-1.52122898,angle:-1.52122898,pivot:{x:219,y:323},pivotoffset:{x:9,y:9}};
+var rightstickdata = {angleoffset:-1.52122898,angle:-1.52122898,pivot:{x:636,y:333},pivotoffset:{x:19,y:9}};
+
+var puppetorigin = {x:486,y:1538,leftstickoffset:200,leftstickoffsetceiling:300,rightstickoffset:218,rightstickoffsetceiling:400};
+
+function gestureStartEventHandler(e) { e.preventDefault(); }
+function gestureChangeEventHandler(e) { e.preventDefault(); }
+function gestureEndEventHandler(e) { e.preventDefault(); }
+
+function initialize() {
+	
+	var touchscreen = document.getElementById('touchscreen');
+	touchscreen.addEventListener("touchstart",startEventHandler,false);
+	touchscreen.addEventListener("touchmove",moveEventHandler,false);
+	touchscreen.addEventListener("touchend",endEventHandler,false);
+	touchscreen.addEventListener("gesturestart",gestureStartEventHandler,false);
+	touchscreen.addEventListener("gesturechange",gestureChangeEventHandler,false);
+	touchscreen.addEventListener("gestureend",gestureEndEventHandler,false);
+	
+	render();
+}
+
+var activetouches = new Object();
+
+var tapcount = 0;
+
+function startEventHandler(e) {
+	//e.preventDefault();
+	
+	for(var i=0; i<e.changedTouches.length;i++) {
+		var touch = e.changedTouches[i];
+		var controlmode = "";
+		
+		//help button click
+		if(touch.pageX >= window.innerWidth - 55 && touch.pageY >= window.innerHeight - 50) {
+			window.location = window.location + "#help";
+		} else {
+			if(tapcount > 0) {
+				if(tapcount == 1) controlmode = "bodymove";
+				else if(tapcount == 2) controlmode = "bodyrotate";
+				else if(tapcount == 3) tapcount = 0;
+			}
+			
+			if(tapcount == 0) {
+				if(touch.pageX < window.innerWidth/2) controlmode = "leftarmrotate";
+				else controlmode = "rightarmrotate";
+			}
+		}
+		activetouches[touch.identifier] = {x:touch.pageX,y:touch.pageY,controlmode:controlmode,tap:true};
+	}
+}
+
+function endEventHandler(e) {
+	e.preventDefault();
+
+	for(var i=0; i<e.changedTouches.length;i++) {
+		var touch = e.changedTouches[i];
+
+		if(activetouches[touch.identifier].tap == true) {
+			tapcount++;
+		}
+		delete activetouches[touch.identifier];
+	}
+}
+
+function moveEventHandler(e) {
+	e.preventDefault();
+	
+	for(var i=0; i<e.changedTouches.length;i++) {
+		var touch = e.changedTouches[i];
+		
+		dx = (touch.pageX - activetouches[touch.identifier].x) * 2 * window.screen.width/1440;
+		dy = (touch.pageY - activetouches[touch.identifier].y) * -2 * window.screen.height/900;
+
+		if(activetouches[touch.identifier].tap == true && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
+			activetouches[touch.identifier].tap = false;
+			
+			if(activetouches[touch.identifier].controlmode == "bodymove" || activetouches[touch.identifier].controlmode == "bodyrotate") {
+				tapcount = 0;
+			}
+		}
+		
+		if(activetouches[touch.identifier].tap != true) {
+		
+			activetouches[touch.identifier].x = touch.pageX;
+			activetouches[touch.identifier].y = touch.pageY;
+			
+			if(activetouches[touch.identifier].controlmode == "leftarmrotate") {
+				var leftarmforce = calculateForce(dx,dy,leftarmdata.angle,leftarmdata.length);
+				var leftshoulderforce = calculateForce(leftarmforce.dx,leftarmforce.dy,leftshoulderdata.angle,leftshoulderdata.length);
+				
+				leftarmdata.angle = betweenNegPIandPI(leftarmdata.angle + leftarmforce.rtheta);
+				leftshoulderdata.angle = betweenNegPIandPI(leftshoulderdata.angle + leftshoulderforce.rtheta);
+				
+				leftarmdata.pivot.x = leftshoulderdata.pivot.x + Math.cos(leftshoulderdata.angle) * leftshoulderdata.length;
+				leftarmdata.pivot.y = leftshoulderdata.pivot.y - Math.sin(leftshoulderdata.angle) * leftshoulderdata.length;
+				
+				leftstickdata.pivot.x = leftarmdata.pivot.x + Math.cos(leftarmdata.angle) * leftarmdata.length;
+				leftstickdata.pivot.y = leftarmdata.pivot.y - Math.sin(leftarmdata.angle) * leftarmdata.length;
+				
+				var randomleftstickoffset = Math.floor(Math.random()*51) * (Math.floor(Math.random()*2) == 1 ? 1 : -1);
+				puppetorigin.leftstickoffset = Math.min(Math.max(puppetorigin.leftstickoffset + randomleftstickoffset,0),puppetorigin.leftstickoffsetceiling);
+				
+			} else if(activetouches[touch.identifier].controlmode == "rightarmrotate") {
+				var rightarmforce = calculateForce(dx,dy,rightarmdata.angle,rightarmdata.length);
+				var rightshoulderforce = calculateForce(rightarmforce.dx,rightarmforce.dy,rightshoulderdata.angle,rightshoulderdata.length);
+				
+				rightarmdata.angle = betweenNegPIandPI(rightarmdata.angle + rightarmforce.rtheta);
+				rightshoulderdata.angle = betweenNegPIandPI(rightshoulderdata.angle + rightshoulderforce.rtheta);
+				
+				rightarmdata.pivot.x = rightshoulderdata.pivot.x + Math.cos(rightshoulderdata.angle) * rightshoulderdata.length;
+				rightarmdata.pivot.y = rightshoulderdata.pivot.y - Math.sin(rightshoulderdata.angle) * rightshoulderdata.length;
+				
+				rightstickdata.pivot.x = rightarmdata.pivot.x + Math.cos(rightarmdata.angle) * rightarmdata.length;
+				rightstickdata.pivot.y = rightarmdata.pivot.y - Math.sin(rightarmdata.angle) * rightarmdata.length;
+				
+				var randomrightstickoffset = Math.floor(Math.random()*51) * (Math.floor(Math.random()*2) == 1 ? 1 : -1);
+				puppetorigin.rightstickoffset = Math.min(Math.max(puppetorigin.rightstickoffset + randomrightstickoffset,0),puppetorigin.rightstickoffsetceiling);
+		
+			} else if(activetouches[touch.identifier].controlmode == "bodyrotate") {
+				var bodyforce = calculateForce(dx,dy,bodydata.angle,bodydata.length);
+				var bodyrtheta = bodyforce.rtheta;
+				
+				leftarmdata.angle = betweenNegPIandPI(leftarmdata.angle + bodyrtheta);
+				leftshoulderdata.angle = betweenNegPIandPI(leftshoulderdata.angle + bodyrtheta);
+				bodydata.angle = betweenNegPIandPI(bodydata.angle + bodyrtheta);
+				rightarmdata.angle = betweenNegPIandPI(rightarmdata.angle + bodyrtheta);
+				rightshoulderdata.angle = betweenNegPIandPI(rightshoulderdata.angle + bodyrtheta);
+	
+				rotatePoint(leftarmdata.pivot,bodydata.pivot,bodyrtheta);
+				rotatePoint(leftshoulderdata.pivot,bodydata.pivot,bodyrtheta);
+				rotatePoint(leftstickdata.pivot,bodydata.pivot,bodyrtheta);
+				rotatePoint(rightarmdata.pivot,bodydata.pivot,bodyrtheta);
+				rotatePoint(rightshoulderdata.pivot,bodydata.pivot,bodyrtheta);
+				rotatePoint(rightstickdata.pivot,bodydata.pivot,bodyrtheta);
+				rotatePoint(puppetorigin,bodydata.pivot,bodyrtheta);
+				
+				var randomleftstickoffset = Math.floor(Math.random()*51) * (Math.floor(Math.random()*2) == 1 ? 1 : -1);
+				puppetorigin.leftstickoffset = Math.min(Math.max(puppetorigin.leftstickoffset + randomleftstickoffset,0),puppetorigin.leftstickoffsetceiling);
+				
+				var randomrightstickoffset = Math.floor(Math.random()*51) * (Math.floor(Math.random()*2) == 1 ? 1 : -1);
+				puppetorigin.rightstickoffset = Math.min(Math.max(puppetorigin.rightstickoffset + randomrightstickoffset,0),puppetorigin.rightstickoffsetceiling);
+				
+			} if(activetouches[touch.identifier].controlmode == "bodymove") {
+				var boundedbodydx = Math.min(Math.max(bodydata.pivot.x + dx,-300),1120) - bodydata.pivot.x;
+				var boundedbodydy = Math.min(Math.max(bodydata.pivot.y - dy,0),600 + bodydata.length) - bodydata.pivot.y;
+		
+				leftarmdata.pivot.x += boundedbodydx;
+				leftshoulderdata.pivot.x += boundedbodydx;
+				leftstickdata.pivot.x += boundedbodydx;
+				bodydata.pivot.x += boundedbodydx;
+				rightarmdata.pivot.x += boundedbodydx;
+				rightshoulderdata.pivot.x += boundedbodydx;
+				rightstickdata.pivot.x += boundedbodydx;
+				puppetorigin.x += boundedbodydx;
+				
+				leftarmdata.pivot.y += boundedbodydy;
+				leftshoulderdata.pivot.y += boundedbodydy;
+				leftstickdata.pivot.y += boundedbodydy;
+				bodydata.pivot.y += boundedbodydy;
+				rightarmdata.pivot.y += boundedbodydy;
+				rightshoulderdata.pivot.y += boundedbodydy;
+				rightstickdata.pivot.y += boundedbodydy;
+				puppetorigin.y += boundedbodydy;
+			}
+		}
+	}
+	
+	var leftstickorigin = {x:puppetorigin.x - puppetorigin.leftstickoffset, y:puppetorigin.y};
+	leftstickdata.angle = Math.atan2(leftstickdata.pivot.y - leftstickorigin.y,
+									 leftstickorigin.x > leftstickdata.pivot.x ? leftstickorigin.x - leftstickdata.pivot.x : leftstickdata.pivot.x - leftstickorigin.x);
+	
+	var rightstickorigin = {x:puppetorigin.x + puppetorigin.rightstickoffset, y:puppetorigin.y};
+	rightstickdata.angle = Math.atan2(rightstickdata.pivot.y - rightstickorigin.y,
+									  rightstickorigin.x > rightstickdata.pivot.x ? rightstickorigin.x - rightstickdata.pivot.x : rightstickdata.pivot.x - rightstickorigin.x);
+									  
+	render();
+}
+
+function calculateForce(dx,dy,angle,length) {
+
+	var theta = Math.atan2(dy,dx);
+	
+	var qangle = betweenZeroandHalfPI(angle);
+	var qtheta = betweenZeroandHalfPI(theta);
+	
+	var dtheta = qtheta > qangle ? qtheta - qangle : qangle - qtheta;
+	
+	var magnitude = Math.sqrt(Math.pow(dx,2) + Math.pow(dy,2));
+	var rotationalforce = Math.sin(dtheta) * magnitude;
+	var nonrotationalforce = Math.cos(dtheta) * magnitude;
+	
+	var rtheta = Math.atan2(rotationalforce,length);
+	
+	if(angle >= 0) {
+		if(theta < angle && theta > (angle - Math.PI)) rtheta *= -1;
+	} else if(angle < 0) {
+		if(theta < angle || theta > (angle + Math.PI)) rtheta *= -1;
+	}
+	//var rdx = nonrotationalforce * Math.cos(sign(theta) == sign(angle) ? angle : invert(angle));
+	//var rdy = nonrotationalforce * Math.sin(sign(theta) == sign(angle) ? angle : invert(angle));
+	var rdx = nonrotationalforce * Math.cos(theta);
+	var rdy = nonrotationalforce * Math.sin(theta);
+	
+	//console.log("rdx: " + rdx + " rdy: " + rdy);
+	
+	return {rtheta:rtheta,
+			dx:rdx,
+			dy:rdy};
+}
+
+function render() {
+	var canvas = document.getElementById('canv');
+	var ctx = canvas.getContext('2d');
+	
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	
+	var screen = document.getElementById('screen');
+	var rightarm = document.getElementById('rightarm');
+	var rightshoulder = document.getElementById('rightshoulder');
+	var rightstick = document.getElementById('rightstick');
+	var body = document.getElementById('body');
+	var leftshoulder = document.getElementById('leftshoulder');
+	var leftarm = document.getElementById('leftarm');
+	var leftstick = document.getElementById('leftstick');
+	
+	ctx.drawImage(screen,0,0);
+	
+	rotateImageAroundPoint(ctx,rightstick,rightstickdata.angle - rightstickdata.angleoffset,rightstickdata.pivot,rightstickdata.pivotoffset);
+	rotateImageAroundPoint(ctx,rightarm,rightarmdata.angle - rightarmdata.angleoffset,rightarmdata.pivot,rightarmdata.pivotoffset);
+	rotateImageAroundPoint(ctx,rightshoulder,rightshoulderdata.angle - rightshoulderdata.angleoffset,rightshoulderdata.pivot,rightshoulderdata.pivotoffset);
+	rotateImageAroundPoint(ctx,body,bodydata.angle - bodydata.angleoffset,bodydata.pivot,bodydata.pivotoffset);
+	rotateImageAroundPoint(ctx,leftshoulder,leftshoulderdata.angle - leftshoulderdata.angleoffset,leftshoulderdata.pivot,leftshoulderdata.pivotoffset);
+	rotateImageAroundPoint(ctx,leftarm,leftarmdata.angle - leftarmdata.angleoffset,leftarmdata.pivot,leftarmdata.pivotoffset);
+	rotateImageAroundPoint(ctx,leftstick,leftstickdata.angle - leftstickdata.angleoffset,leftstickdata.pivot,leftstickdata.pivotoffset);
+	
+	ctx.save();
+	ctx.globalAlpha=.27;
+	ctx.drawImage(screen,0,0);
+	ctx.restore();
+}
+
+function rotateImageAroundPoint(ctx,image,theta,pivot,pivotoffset) {
+	ctx.save();
+	ctx.translate( pivot.x, pivot.y);
+	ctx.rotate( -theta );
+	ctx.translate( -1 * pivotoffset.x, -1 * pivotoffset.y );
+	ctx.drawImage( image, 0, 0 );
+	ctx.restore();
+}
+
+function betweenNegPIandPI(angle) {
+	if(angle > Math.PI) {
+		var modangle = angle % Math.PI;
+		angle = modangle - Math.PI;
+	} else if(angle < -1 * Math.PI) {
+		var modangle = angle % -Math.PI;
+		angle = modangle + Math.PI;
+	}
+	return angle;
+}
+
+// assumes angle is between -pi and pi
+function betweenZeroandHalfPI(angle) {
+	if(angle > Math.PI/2 && angle <= Math.PI) {
+		angle = Math.PI - angle;
+	}
+	else if(angle < 0 && angle >= Math.PI/-2) {
+		angle = Math.abs(angle);
+	}
+	else if(angle < Math.PI/-2 && angle >= Math.PI * -1) {
+		angle = angle + Math.PI;
+	}
+	return angle;
+}
+
+/*
+function sign(number) {
+	if(number == 0) return 0;
+	else return number/Math.abs(number);
+}
+
+function invert(angle) {
+	if(angle > 0) return angle - Math.PI;
+	else if(angle <= 0) return angle + Math.PI;
+}*/
+
+function rotatePoint(targetpoint,refpoint,theta) {
+	var dx = targetpoint.x - refpoint.x;
+	var dy = refpoint.y - targetpoint.y;
+	
+	var angle = betweenNegPIandPI(Math.atan2(dy,dx) + theta);
+	var length = Math.sqrt(Math.pow(dx,2) + Math.pow(dy,2));
+	targetpoint.x = refpoint.x + Math.cos(angle) * length;
+	targetpoint.y = refpoint.y - Math.sin(angle) * length;
+}
+
+function showHelp() {
+	//alert("Balinese Shadow Puppet Arjuna\n\nTouch the left side of the screen to control the left arm.\nTouch the right side of the screen to control the right arm.\nTap once and touch to move Arjuna.\nTap twice and touch to rotate Arjuna.");
+	var canvas = document.getElementById('canv');
+	var ctx = canvas.getContext('2d');
+	ctx.save();
+	ctx.fillStyle="#000000";
+	ctx.font = "20px sans-serif";
+	ctx.fillText("Balinese Shadow Puppet Arjuna", 10, 30);
+	ctx.restore();
+	
+	
+}
+</script>
+<style type="text/css">
+#centered {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	margin-top: -300px;
+	margin-left: -400px;
+}
+
+#bottomright {
+	position: absolute;
+	top:100%;
+	left:100%;
+	margin-top: -50px;
+	margin-left: -55px;
+}
+#bottomright:hover {
+	cursor:pointer;
+}
+#bottomright:active {
+	cursor:pointer;
+}
+
+.divTouchScreen  {
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+}
+
+.divModalDialog  {
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    display:none;
+    /* last attribute set darkness on scale: 0...1.0 */
+    background-color:rgba(0,0,0,0.8);
+    z-index:101;
+}
+
+.divModalDialog:target  { display:block; }
+
+#helpwindow {
+	position:fixed;
+    top:50%;
+    left:50%;
+    margin-top:-300px;
+    margin-left:-400px;
+}
+
+.preload {
+	display:none;
+}
+
+</style>
+</head>
+<body onload="initialize();" style="background-color:black">
+	<div id="touchscreen" class="divTouchScreen">
+		<div id="centered">
+			<canvas id="canv" width="800" height="600"></canvas>
+			<div id="canvimages" class="preload"/>
+				<img id="screen" src="screen.jpg"/>
+				<img id="rightarm" src="rightarm.png"/>
+				<img id="rightshoulder" src="rightshoulder.png"/>
+				<img id="rightstick" src="rightstick.png"/>
+				<img id="body" src="body.png"/>
+				<img id="leftshoulder" src="leftshoulder.png"/>
+				<img id="leftarm" src="leftarm.png"/>
+				<img id="leftstick" src="leftstick.png"/>
+			</div>
+		</div>
+	</div>
+	<div id="bottomright">
+		<a href="#help"><img src="helpicon.png"/></a>
+	</div>
+	<div id="help" class="divModalDialog">
+        <div id="helpwindow">
+        	<a href="#"><img src="helpscreen.png" onclick="tapcount = 0;"/></a>
+        </div>
+    </div>
+</body>
+</html>
